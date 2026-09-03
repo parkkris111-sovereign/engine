@@ -1,0 +1,38 @@
+[package]
+name = "sovereign-engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["Sovereign Engine Core Team"]
+description = "State-resident rearm authority state machine and deterministic verification engine"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["security", "typestate", "no_std", "cryptography", "state-machine"]
+categories = ["no-std", "cryptography", "embedded"]
+
+[features]
+# By default, include standard library support (allows std::error::Error implementations, etc.)
+default = ["std"]
+
+# Optional std feature. When disabled, the crate builds strictly `no_std` (requires `alloc`).
+std = [
+    "sha2/std",
+    "subtle/std",
+]
+
+[dependencies]
+# Standard SHA-256 implementation with explicit no_std compatibility
+sha2 = { version = "0.10", default-features = false }
+
+# Constant-time comparison library essential for preventing side-channel attacks during commitment checks
+subtle = { version = "2.5", default-features = false }
+
+[dev-dependencies]
+# Required for in-memory integration testing adapters (HashMap, Vec transport helpers)
+hex = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
