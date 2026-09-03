@@ -1,0 +1,241 @@
+//! # Sovereign Engine Security Policy
+//!
+//! ## Invariant: State-Resident Rearm Authority
+//!
+//! The `rearm()` operation is the only authorized transition from a terminal
+//! engine state (`Sealed` or `SafeState`) to the active `Idle` operational state.
+//!
+//! ### Formulating Principle
+//!
+//! **Persistence does not restore authority.**
+//!
+//! Persistence presents evidence. The resident engine state independently proves
+//! whether that evidence belongs to the exact terminal state currently held by
+//! the engine.
+//!
+//! A `PersistenceReceipt` is therefore not itself authority to reset the engine.
+//! It is cryptographic evidence whose validity is determined by recomputation
+//! against the engine's resident terminal lineage.
+//!
+//! ### Mathematical Authorization Rule
+//!
+//! The transition $S_{\text{terminal}} \to S_{\text{idle}}$ is authorized **if and only if**:
+//!
+//! ```text
+//!               +-------------------------------------------------------+
+//!   rearm() <=> | C_receipt == C_expected                               |
+//!               +-------------------------------------------------------+
+//! ```
+//!
+//! More precisely, the commitment supplied by the receipt **MUST NOT** be trusted
+//! directly. The engine independently computes:
+//!
+//! ```text
+//! C_expected = H(
+//!     VERSION
+//!     || DOMAIN_PERSISTENCE_RECEIPT
+//!     || H_terminal
+//!     || Encode_Canonical(artifact)
+//! )
+//! ```
+//!
+//! and authorizes rearm **only** when `C_receipt == C_expected`.
+//!
+//! ### Constant-Time Authorization Predicate
+//!
+//! `C_receipt == C_expected` denotes comparison of fixed-size commitment values
+//! using a **constant-time equality operation**.
+//!
+//! Verification **MUST NOT** expose an early-exit, byte-position-dependent comparison
+//! of commitment material.
+//!
+//! After successful structural parsing and canonical framing, the constant-time
+//! equality result between `C_receipt` and `C_expected` is the **sole cryptographic
+//! authorization predicate** for the `rearm()` transition.
+//!
+//! ### Canonical Artifact Encoding
+//!
+//! `Encode_Canonical(artifact)` is the unique, deterministic binary framing:
+//!
+//! ```text
+//! u64_le(artifact.len()) || artifact_bytes
+//! ```
+//!
+//! No alternate serialization, implicit string conversion, pointer-derived
+//! representation, variable-width integer encoding, or runtime-dependent
+//! framing is permitted to enter the commitment digest.
+//!
+//! ### Lineage Binding Requirement
+//!
+//! Epoch separation is guaranteed only because the canonical epoch identity is
+//! cryptographically incorporated into the execution lineage from which
+//! `H_terminal` is derived.
+//!
+//! Conceptually:
+//!
+//! ```text
+//! H_terminal = H(
+//!     VERSION
+//!     || DOMAIN_TERMINAL
+//!     || H_lineage
+//!     || terminal_transition_data
+//! )
+//!
+//! H_lineage = ... H(
+//!     VERSION
+//!     || DOMAIN_GENESIS
+//!     || Encode_Canonical(epoch)
+//!     || Encode_Canonical(seed)
+//! )
+//! ```
+//!
+//! Therefore, epoch identity **MUST NOT** exist solely as metadata outside the
+//! cryptographically committed lineage.
+//!
+//! ### State Binding Parameters
+//!
+//! Where:
+//! - `C_receipt` is the commitment contained in the `PersistenceReceipt` capability evidence.
+//! - `H_terminal` is the resident cryptographic state hash of the engine at the moment `rearm()` is invoked.
+//! - `H_terminal` is **never** reconstructed from persistence evidence.
+//! - `Encode_Canonical(artifact)` is the length-prefixed, deterministic byte representation of the persisted terminal artifact.
+//!
+//! The receipt is valid **only** relative to the exact resident `H_terminal` against which its commitment is recomputed.
+//!
+//! ---
+//!
+//! ## Formal Operational Guarantees
+//!
+//! ### 1. Zero External Trust
+//! A compromised storage layer, forged `PersistenceAdapter`, or arbitrary external caller cannot force a state reset by presenting a syntactically valid receipt. External persistence provides bytes and evidence only. Authorization remains resident in the engine because verification is strictly bound to `H_terminal`.
+//!
+//! ### 2. Payload Identity
+//! Any modification to the persisted artifact, including:
+//! - a single-bit mutation,
+//! - truncation or byte extension,
+//! - field substitution, or
+//! - non-canonical re-encoding,
+//!
+//! alters `Encode_Canonical(artifact)` or its resulting commitment and causes instant authorization failure.
+//!
+//! ### 3. Terminal-State Non-Substitution
+//! A receipt bound to terminal state `H_terminal_A` cannot computationally
+//! authorize rearm of an engine currently holding terminal state
+//! `H_terminal_B`, where:
+//!
+//! ```text
+//! H_terminal_A != H_terminal_B
+//! ```
+//!
+//! The engine independently computes:
+//!
+//! ```text
+//! C_expected_B = H(
+//!     VERSION
+//!     || DOMAIN_PERSISTENCE_RECEIPT
+//!     || H_terminal_B
+//!     || Encode_Canonical(artifact)
+//! )
+//! ```
+//!
+//! A receipt generated against `H_terminal_A` is rejected unless an adversary
+//! can produce a cryptographic collision or second preimage against the selected
+//! hash construction.
+//!
+//! Therefore:
+//!
+//! ```text
+//! C_receipt != C_expected_B => rearm() rejected
+//! ```
+//!
+//! under the assumed collision-resistance and second-preimage resistance of the
+//! protocol hash function.
+//!
+//! ### 4. Epoch Non-Replayability
+//! `H_terminal` incorporates the cryptographic execution lineage of its epoch.
+//!
+//! ```text
+//! E1 != E2
+//!     => canonical lineage inputs differ
+//!     => distinct domain-separated terminal commitments are computed
+//!     => cross-epoch substitution requires breaking the cryptographic
+//!        security assumptions of H
+//! ```
+//!
+//! A persistence receipt is therefore bound to a specific terminal lineage and
+//! cannot become a general-purpose reset credential.
+//!
+//! ### 5. Failure Atomicity
+//! All authorization checks **MUST** complete before the engine mutates its resident state. On any verification failure:
+//!
+//! ```text
+//! rearm(...) -> Err(self)
+//! ```
+//!
+//! The returned engine **MUST** preserve its pre-invocation logical state. In particular, failed verification **MUST NOT**:
+//! - transition the state machine,
+//! - replace or overwrite `H_terminal`,
+//! - zeroize valid resident state,
+//! - partially restore persisted state, or
+//! - consume authorization evidence.
+//!
+//! ### 6. State Independence of Next-State Derivation
+//! The active state resulting from a successful `rearm()` **MUST NOT** inherit state variables from the external artifact.
+//!
+//! Derivation inputs allowed:
+//! - Protocol-defined `VERSION`
+//! - Canonical epoch / next execution identity
+//! - Protocol-authorized genesis inputs
+//!
+//! Derivation inputs forbidden:
+//! - Persisted artifact payload bytes
+//! - `PersistenceReceipt` commitment material
+//! - Externally supplied state hashes
+//!
+//! ---
+//!
+//! ## Architectural Security Boundary & Execution Pipeline
+//!
+//! ```text
+//!                   Unverified External Transport Layer
+//!                                    |
+//!                      artifact + PersistenceReceipt
+//!                                    v
+//!                 +--------------------------------------+
+//!                 |       1. Artifact Parsing            |
+//!                 |          Verify structural layout    |
+//!                 +------------------+-------------------+
+//!                                    |
+//!                                    v
+//!                 +--------------------------------------+
+//!                 |       2. Canonical Framing           |
+//!                 |          Encode_Canonical(artifact)  |
+//!                 +------------------+-------------------+
+//!                                    |
+//!                                    v
+//!                 +--------------------------------------+
+//!                 |    3. Commitment Recomputation       |
+//!                 |       C_expected = H( ... )          |
+//!                 +------------------+-------------------+
+//!                                    |
+//!                                    v
+//!                 +--------------------------------------+
+//!                 |    4. Constant-Time Verification     |
+//!                 |       C_receipt == C_expected        |
+//!                 +------------------+-------------------+
+//!                                    |
+//!                         +----------+----------+
+//!                         |                     |
+//!                      mismatch               match
+//!                         |                     |
+//!                      Err(self)      5. Deterministic Next-State
+//!                         |              Derivation (Protocol Rules)
+//!                         |              (Forbidden: External Bytes)
+//!                         v                     |
+//!                   Retain State                v
+//!                                     Atomic Transition to Idle
+//! ```
+//!
+//! > **Core Security Property:**
+//! > External bytes may prove that a transition is permitted, but external
+//! > bytes never define the state to which authority transitions.
