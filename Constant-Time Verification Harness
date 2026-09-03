@@ -1,0 +1,46 @@
+//! # Dudect Constant-Time Verification Harness
+//!
+//! Evaluates timing variance during commitment verification across random vs fixed inputs.
+
+use dudect_bencher::{ctbench_main, BenchRng, Class, CtRunner};
+use sovereign_engine::protocol::{Commitment, StateHash};
+use sovereign_engine::receipt::PersistenceReceipt;
+use sovereign_engine::verifier::verify_rearm_authority;
+
+fn bench_verify_rearm_authority(runner: &mut CtRunner, mut rng: BenchRng) {
+    let mut fixed_hash_bytes = [0u8; 32];
+    rng.fill_bytes(&mut fixed_hash_bytes);
+    let terminal_hash = StateHash::from_bytes(fixed_hash_bytes);
+
+    let mut fixed_payload = vec![0u8; 256];
+    rng.fill_bytes(&mut fixed_payload);
+
+    // Compute matching valid receipt
+    let valid_commitment = sovereign_engine::verifier::compute_expected_commitment(&terminal_hash, &fixed_payload);
+    let valid_receipt = PersistenceReceipt::new(valid_commitment);
+
+    runner.run_loop(|class| {
+        let (receipt_to_test, payload_to_test) = match class {
+            Class::Left => {
+                // Class Left: Valid matching commitment
+                (valid_receipt, fixed_payload.as_slice())
+            }
+            Class::Right => {
+                // Class Right: Random forged commitment
+                let mut random_bytes = [0u8; 32];
+                rng.fill_bytes(&mut random_bytes);
+                let random_receipt = PersistenceReceipt::new(Commitment::from_bytes(random_bytes));
+                (random_receipt, fixed_payload.as_slice())
+            }
+        };
+
+        // Measure execution timing of verify_rearm_authority
+        let _ = dudect_bencher::black_box(verify_rearm_authority(
+            &terminal_hash,
+            &receipt_to_test,
+            payload_to_test,
+        ));
+    });
+}
+
+ctbench_main!(bench_verify_rearm_authority);
