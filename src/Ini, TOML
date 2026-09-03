@@ -1,0 +1,10 @@
+[dependencies]
+# Existing dependencies...
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "chrono"] }
+sha2 = "0.10"
+hex = "0.4"
+tracing = "0.1"
+
+# Sovereign Engine Core
+sovereign-engine = { path = "../sovereign-engine" }
