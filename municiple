@@ -1,0 +1,8 @@
+-- Test: Attempt to maliciously alter a municipal payout amount
+UPDATE municipal_events 
+SET payload_data = jsonb_set(payload_data, '{payout_amount_usd}', '500000.00')
+WHERE event_id = '33333333-3333-3333-3333-333333333333';
+
+-- Expected Result:
+-- ERROR: CRITICAL SECURITY VIOLATION: Audit logs and commitment receipts are immutable. 
+-- Operation UPDATE blocked on table municipal_events.
