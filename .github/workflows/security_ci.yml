@@ -1,0 +1,114 @@
+name: Sovereign Engine Security & Verification Pipeline
+
+on:
+  push:
+    branches: [ "main", "release/*" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    # Run daily at midnight UTC to catch newly disclosed advisory CVEs
+    - cron: '0 0 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # ============================================================================
+  # JOB 1: SUPPLY CHAIN SECURITY & AUDIT
+  # ============================================================================
+  security-audit:
+    name: Dependency Audit & Policy Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Install Stable Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit & cargo-deny
+        run: cargo install cargo-audit cargo-deny --locked
+
+      - name: Run Advisory Vulnerability Audit
+        run: cargo audit
+
+      - name: Run Dependency & License Policy Check
+        run: cargo deny check
+
+  # ============================================================================
+  # JOB 2: UNDEFINED BEHAVIOR & MEMORY SAFETY (MIRI)
+  # ============================================================================
+  miri-analysis:
+    name: Memory Safety & UB Checks (Miri)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Install Nightly Toolchain with Miri
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Miri Test Environment
+        run: cargo miri setup
+
+      - name: Execute Full Integration Suite Under Miri
+        env:
+          MIRIFLAGS: "-Zmiri-symbolic-alignment-check -Zmiri-strict-provenance -Zmiri-backtrace=full"
+        run: cargo miri test --all-targets --no-default-features
+
+  # ============================================================================
+  # JOB 3: CONSTANT-TIME SIDE-CHANNEL ANALYSIS (DUDECT)
+  # ============================================================================
+  sidechannel-dudect:
+    name: Constant-Time Analysis (dudect)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Install Nightly Toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache Cargo Dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run Constant-Time Timing Verification
+        # Note: Optimization flags must be explicitly enabled to verify LLVM
+        # did not introduce conditional branches during codegen passes.
+        env:
+          RUSTFLAGS: "-C opt-level=3 -C target-cpu=native"
+        run: cargo test --bench dudect_verifier -- --nocapture
+
+  # ============================================================================
+  # JOB 4: NO_STD TARGET COMPILATION CHECK
+  # ============================================================================
+  embedded-nostd-check:
+    name: Bare-Metal no_std Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Install Target Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi, x86_64-unknown-none
+
+      - name: Verify strict no_std Compilation (Cortex-M)
+        run: cargo build --no-default-features --target thumbv7em-none-eabi
+
+      - name: Verify strict no_std Compilation (Bare x86_64)
+        run: cargo build --no-default-features --target x86_64-unknown-none
