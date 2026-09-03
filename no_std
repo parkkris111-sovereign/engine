@@ -1,0 +1,1 @@
+cargo build --no-default-features --target thumbv7em-none-eabi
