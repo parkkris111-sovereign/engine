@@ -1,14 +1,38 @@
+[workspace]
+members = [".", "../sovereign-engine"]
+resolver = "2"
+
+[package]
+name = "sovereign-engine-api"
+version = "0.1.0"
+edition = "2021"
+
 [dependencies]
+# Web framework
 axum = { version = "0.7", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
+
+# Async runtime - only essential features
+# Removed "full" feature; included only required features for this application
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal-hook-tokio"] }
+
+# Database driver with essential features
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "chrono"] }
+
+# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# UUID and time utilities
 uuid = { version = "1.6", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
+
+# Cryptography
 sha2 = "0.10"
+hex = "0.4"
+
+# Observability - use env_filter to reduce overhead
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Sovereign Engine Core
 sovereign-engine = { path = "../sovereign-engine" }
