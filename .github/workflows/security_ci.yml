@@ -27,9 +27,10 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-
-      - name: Install Stable Toolchain
+       - name: Install Stable Toolchain
         uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
+        with:
+          toolchain: stable
 
       - name: Cache Cargo Dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
@@ -56,6 +57,7 @@ jobs:
       - name: Install Nightly Toolchain with Miri
         uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
         with:
+          toolchain: nightly
           components: miri
 
       - name: Cache Cargo Dependencies
@@ -81,7 +83,8 @@ jobs:
 
       - name: Install Nightly Toolchain
         uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
-
+        with:
+          toolchain: nightly
       - name: Cache Cargo Dependencies
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
 
@@ -105,6 +108,7 @@ jobs:
       - name: Install Target Toolchain
         uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0
         with:
+          toolchain: stable
           targets: thumbv7em-none-eabi, x86_64-unknown-none
 
       - name: Verify strict no_std Compilation (Cortex-M)
