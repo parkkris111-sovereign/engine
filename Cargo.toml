@@ -13,7 +13,7 @@ axum = { version = "0.7", features = ["json"] }
 
 # Async runtime - only essential features
 # Removed "full" feature; included only required features for this application
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal-hook-tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 # Database driver with essential features
 sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "chrono"] }
