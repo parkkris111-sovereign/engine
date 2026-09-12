@@ -26,15 +26,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Sovereign Engine Core
 sovereign-engine = { path = "sovereign-engine" }
 [target.'cfg(not(target_os = "none"))'.dependencies]
-axum = { version = "0.7", features = ["json"] }
-
+axum = { version = "0.8.1", features = ["json"] }
 # Async runtime - only essential features
 # Removed "full" feature; included only required features for this application
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 # Database driver with essential features
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "chrono"] }
-
+sqlx = { version = "0.8.1", features = ["postgres", "runtime-tokio-rustls", "uuid", "json", "chrono"] }
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
