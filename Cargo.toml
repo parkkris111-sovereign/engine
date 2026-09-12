@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "../sovereign-engine"]
+members = [".", "sovereign-engine"]
 resolver = "2"
 
 [package]
@@ -35,4 +35,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Sovereign Engine Core
-sovereign-engine = { path = "../sovereign-engine" }
+sovereign-engine = { path = "sovereign-engine" }
